@@ -1,0 +1,185 @@
+/* Global Styles for Kaaya PWA */
+
+/* Define CSS variables for both themes.  Default values correspond to the dark
+   cosmic theme.  These can be overridden by applying the `.theme-light`
+   class to the html element via the ThemeContext provider. */
+:root {
+  --bg-start: #15204f;
+  --bg-mid: #0a0f24;
+  --bg-end: #05091b;
+  --text-color: #ffffff;
+  --muted-color: #9ca3af;
+  --card-bg: rgba(31, 41, 55, 0.6);
+  --card-border: rgb(55, 65, 81);
+  --button-start: #ec4899;
+  --button-mid: #8b5cf6;
+  --button-end: #6366f1;
+  --nav-bg: rgba(17, 24, 39, 0.8);
+  --nav-border: rgb(55, 65, 81);
+  --active-color: #c084fc;
+}
+
+/* Light theme overrides */
+.theme-light {
+  --bg-start: #f5f3ff;
+  --bg-mid: #e9e5fb;
+  --bg-end: #dcd6f4;
+  --text-color: #1f2937;
+  --muted-color: #6b7280;
+  --card-bg: rgba(255, 255, 255, 0.8);
+  --card-border: #e5e7eb;
+  --button-start: #8b5cf6;
+  --button-mid: #ec4899;
+  --button-end: #f472b6;
+  --nav-bg: rgba(255, 255, 255, 0.8);
+  --nav-border: #e5e7eb;
+  --active-color: #8b5cf6;
+}
+
+/* Cosmic gradient background */
+body {
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  color: var(--text-color);
+  font-family: Arial, sans-serif;
+  background: radial-gradient(circle at 20% 30%, var(--bg-start) 0%, var(--bg-mid) 45%, var(--bg-end) 100%);
+}
+
+/* Container for pages */
+.page-container {
+  padding: 1rem;
+  max-width: 400px;
+  margin: 0 auto;
+  padding-bottom: 4rem; /* leave space for nav */
+}
+
+/* Headings */
+h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: var(--text-color);
+}
+h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-color);
+}
+h3 {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--text-color);
+}
+p {
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
+  color: var(--text-color);
+}
+
+/* Card component */
+.card {
+  background: var(--card-bg);
+  backdrop-filter: blur(8px);
+  border-radius: 1rem;
+  border: 1px solid var(--card-border);
+  padding: 1rem;
+  box-shadow: 0 0 20px rgba(92, 39, 181, 0.3);
+  margin-bottom: 1rem;
+}
+
+/* Glow button */
+.btn-glow {
+  display: inline-block;
+  background: linear-gradient(to right, var(--button-start), var(--button-mid), var(--button-end));
+  color: var(--text-color);
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  box-shadow: 0 0 15px rgba(92, 39, 181, 0.4);
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s;
+  text-decoration: none;
+  text-align: center;
+}
+.btn-glow:hover {
+  transform: scale(1.05);
+}
+.btn-glow:active {
+  transform: scale(0.95);
+}
+
+/* Input and select styles */
+input[type="number"],
+input[type="text"],
+input[type="email"],
+input[type="password"],
+select {
+  background-color: rgba(17, 24, 39, 0.7);
+  border: 1px solid var(--card-border);
+  color: var(--text-color);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 0.5rem;
+}
+
+label {
+  font-size: 0.875rem;
+  color: var(--muted-color);
+}
+
+/* Navbar */
+.navbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--nav-bg);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--nav-border);
+  display: flex;
+  justify-content: space-around;
+  padding: 0.5rem 0;
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--muted-color);
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+.nav-item.active {
+  color: var(--active-color);
+}
+.nav-item span {
+  margin-top: 0.25rem;
+}
+
+/* App container */
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Checkboxes */
+input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #8b5cf6;
+}
+
+/* Photo thumbnails */
+.photo-thumb {
+  width: 6rem;
+  height: 6rem;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 2px solid rgba(139, 92, 246, 0.7);
+}
