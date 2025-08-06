@@ -98,13 +98,17 @@ export function getRoutines() {
   let imported = [];
   if (typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem('importedRoutines');
-      if (stored) imported = JSON.parse(stored);
-    } catch (e) {
-      console.error('Failed to parse imported routines', e);
+      imported = JSON.parse(localStorage.getItem('importedRoutines')) || [];
+    } catch {
+      imported = [];
     }
   }
-  return data.routines.concat(imported);
+  const allRoutines = data.routines.concat(imported);
+  // Deduplicate routines by ID
+  const uniqueRoutines = allRoutines.filter((routine, index, self) =>
+    index === self.findIndex((r) => r.id === routine.id)
+  );
+  return uniqueRoutines;
 }
 
 /**
