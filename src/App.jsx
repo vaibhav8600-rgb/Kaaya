@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home';
+import BodyAndWeight from './pages/BodyAndWeight';
 import Workout from './pages/Workout';
 import RoutineBuilder from './pages/RoutineBuilder';
 import Progress from './pages/Progress';
@@ -31,7 +32,7 @@ export default function App() {
         <Route path="/progress" element={<PrivateRoute element={<Progress />} />} />
         <Route path="/history" element={<PrivateRoute element={<History />} />} />
         {/* Unified body/weight stats page */}
-        <Route path="/stats" element={<PrivateRoute element={<Stats />} />} />
+        <Route path="/bodyweight" element={<PrivateRoute element={<BodyAndWeight />} />} />
         <Route path="/profile" element={<PrivateRoute element={<UserProfile />} />} />
         <Route path="/settings" element={<PrivateRoute element={<Settings />} />} />
       </Route>

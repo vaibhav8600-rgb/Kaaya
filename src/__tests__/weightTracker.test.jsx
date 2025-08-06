@@ -1,11 +1,11 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import WeightTracker from '../pages/WeightTracker';
+import BodyAndWeight from '../pages/BodyAndWeight';
 import { UserContext } from '../context/UserContext';
 import { ThemeContext } from '../context/ThemeContext';
 
 /**
- * Minimal unit tests for WeightTracker to verify that entries can be added
+ * Minimal unit tests for BodyAndWeight to verify that entries can be added
  * and displayed.  In a real environment, additional tests would cover goal
  * progress calculations, chart rendering, and heatmap creation.
  */
@@ -15,7 +15,7 @@ test('allows adding and displaying weight entries', () => {
   render(
     <UserContext.Provider value={{ currentUser, updateUser }}>
       <ThemeContext.Provider value={{ theme: 'dark', toggleTheme: jest.fn() }}>
-        <WeightTracker />
+        <BodyAndWeight />
       </ThemeContext.Provider>
     </UserContext.Provider>,
   );
