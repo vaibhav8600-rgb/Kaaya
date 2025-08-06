@@ -19,10 +19,25 @@ export default function Workout() {
   const [sessionData, setSessionData] = useState(() => {
     const initial = {};
     routine.exercises.forEach((ex) => {
-      initial[ex.id] = ex.sets.map((set) => ({ reps: set.reps || '', weight: set.weight || '' }));
+      initial[ex.id] = ex.sets.map((set) => ({
+        reps: set.reps !== undefined && set.reps !== null ? set.reps : '',
+        weight: set.weight !== undefined && set.weight !== null ? set.weight : ''
+      }));
     });
     return initial;
   });
+
+  // Reset sessionData whenever the routine changes
+  useEffect(() => {
+    const initial = {};
+    routine.exercises.forEach((ex) => {
+      initial[ex.id] = ex.sets.map((set) => ({
+        reps: set.reps !== undefined && set.reps !== null ? set.reps : '',
+        weight: set.weight !== undefined && set.weight !== null ? set.weight : ''
+      }));
+    });
+    setSessionData(initial);
+  }, [routine]);
 
   // Load previous sessions for each exercise from localStorage
   const [previousLogs, setPreviousLogs] = useState({});
@@ -79,14 +94,14 @@ export default function Workout() {
               >
                 <input
                   type="number"
-                  value={set.reps}
+                  value={set.reps !== undefined && set.reps !== null ? set.reps : ''}
                   onChange={(e) => handleInputChange(exercise.id, index, 'reps', e.target.value)}
                   placeholder="reps"
                   style={{ width: '4rem', marginRight: '0.5rem' }}
                 />
                 <input
                   type="number"
-                  value={set.weight}
+                  value={set.weight !== undefined && set.weight !== null ? set.weight : ''}
                   onChange={(e) => handleInputChange(exercise.id, index, 'weight', e.target.value)}
                   placeholder="kg"
                   style={{ width: '5rem', marginRight: '0.5rem' }}
@@ -101,9 +116,34 @@ export default function Workout() {
             ))}
             {/* Previous session display */}
             {prev && (
-              <div className="card" style={{ marginTop: '0.5rem', background: 'rgba(255,255,255,0.05)' }}>
+              <div className="card" style={{ marginTop: '0.5rem', background: 'rgba(255,255,255,0.05)', position: 'relative' }}>
                 <p style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '0.25rem' }}>
                   Last session: {new Date(prev.date).toLocaleDateString()}
+                  <button
+                    aria-label="Delete previous session"
+                    style={{ background: 'none', border: 'none', color: '#ec4899', cursor: 'pointer', fontSize: '1.1rem', marginLeft: 8 }}
+                    onClick={() => {
+                      // Remove the last session for this exercise from localStorage and update state
+                      const logs = JSON.parse(localStorage.getItem('exerciseLogs') || '{}');
+                      if (logs[exercise.id] && logs[exercise.id].length > 0) {
+                        logs[exercise.id].pop();
+                        localStorage.setItem('exerciseLogs', JSON.stringify(logs));
+                        // Force update previousLogs state
+                        setPreviousLogs((prevLogs) => {
+                          const updated = { ...prevLogs };
+                          if (logs[exercise.id] && logs[exercise.id].length > 0) {
+                            updated[exercise.id] = logs[exercise.id][logs[exercise.id].length - 1];
+                          } else {
+                            delete updated[exercise.id];
+                          }
+                          return updated;
+                        });
+                      }
+                    }}
+                    title="Delete previous session"
+                  >
+                    🗑️
+                  </button>
                 </p>
                 {prev.sets.map((s, idx) => (
                   <p key={idx} style={{ fontSize: '0.875rem', color: '#9ca3af' }}>

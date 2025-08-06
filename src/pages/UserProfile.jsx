@@ -2,6 +2,7 @@ import React, { useContext, useState } from 'react';
 import { UserContext } from '../context/UserContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
+import { validateAndCompressImage, MAX_IMAGE_SIZE_MB } from '../utils/imageUtils';
 
 /**
  * UserProfile page displays and allows editing of the current user's personal
@@ -15,26 +16,39 @@ export default function UserProfile() {
   const { logoutUser } = useContext(UserContext);
   const navigate = useNavigate();
   const [preview, setPreview] = useState(currentUser?.photo || '');
+  // Local state for all fields to prevent context update on every keystroke
+  const [form, setForm] = useState({
+    name: currentUser.name || '',
+    age: currentUser.age || '',
+    height: currentUser.height || '',
+    email: currentUser.email || '',
+    units: currentUser.units || 'kg',
+  });
 
   if (!currentUser) {
     return <p style={{ color: 'var(--muted-color)' }}>No user selected.</p>;
   }
 
-  function handlePhotoChange(e) {
+  async function handlePhotoChange(e) {
     const file = e.target.files && e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUrl = reader.result;
-        setPreview(dataUrl);
-        updateUser(currentUser.id, { photo: dataUrl });
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    try {
+      const { thumbnail } = await validateAndCompressImage(file);
+      setPreview(thumbnail);
+      updateUser(currentUser.id, { photo: thumbnail });
+    } catch (err) {
+      alert(err.message || `Image too large. Please upload an image under ${MAX_IMAGE_SIZE_MB}MB.`);
     }
   }
 
   function handleChange(field, value) {
-    updateUser(currentUser.id, { [field]: value });
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleBlur(field) {
+    if (form[field] !== currentUser[field]) {
+      updateUser(currentUser.id, { [field]: form[field] });
+    }
   }
 
   return (
@@ -51,15 +65,39 @@ export default function UserProfile() {
           )}
         </div>
         <label>Name</label>
-        <input type="text" value={currentUser.name || ''} onChange={(e) => handleChange('name', e.target.value)} />
+        <input
+          type="text"
+          value={form.name}
+          onChange={(e) => handleChange('name', e.target.value)}
+          onBlur={() => handleBlur('name')}
+        />
         <label>Age</label>
-        <input type="number" value={currentUser.age || ''} onChange={(e) => handleChange('age', e.target.value)} />
+        <input
+          type="number"
+          value={form.age}
+          onChange={(e) => handleChange('age', e.target.value)}
+          onBlur={() => handleBlur('age')}
+        />
         <label>Height (cm)</label>
-        <input type="number" value={currentUser.height || ''} onChange={(e) => handleChange('height', e.target.value)} />
+        <input
+          type="number"
+          value={form.height}
+          onChange={(e) => handleChange('height', e.target.value)}
+          onBlur={() => handleBlur('height')}
+        />
         <label>Email</label>
-        <input type="email" value={currentUser.email || ''} onChange={(e) => handleChange('email', e.target.value)} />
+        <input
+          type="email"
+          value={form.email}
+          onChange={(e) => handleChange('email', e.target.value)}
+          onBlur={() => handleBlur('email')}
+        />
         <label>Units</label>
-        <select value={currentUser.units || 'kg'} onChange={(e) => handleChange('units', e.target.value)}>
+        <select
+          value={form.units}
+          onChange={(e) => handleChange('units', e.target.value)}
+          onBlur={() => handleBlur('units')}
+        >
           <option value="kg">kg</option>
           <option value="lbs">lbs</option>
         </select>

@@ -13,11 +13,19 @@ export default function Settings() {
 
   // State for import preview (optional)
   const [importPreview, setImportPreview] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importedRows, setImportedRows] = useState([]);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
-  // Handle importing CSV or JSON workout/body stat data
+  // Handle importing CSV or JSON workout/body stat data with preview and deduplication
   function handleImport(event) {
     const file = event.target.files && event.target.files[0];
     if (!file) return;
+    setImportLoading(true);
+    setImportProgress(0);
+    setImportedRows([]);
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -29,17 +37,66 @@ export default function Settings() {
           parsed = parseCsv(content);
         } else {
           alert('Unsupported file type. Please select a CSV or JSON file.');
+          setImportLoading(false);
           return;
         }
-        // Show preview and ask for confirmation
-        const confirmImport = window.confirm(
-          `Import ${Array.isArray(parsed) ? parsed.length : Object.keys(parsed).length} entries from ${file.name}?`
-        );
-        if (confirmImport) {
-          mergeImportedData(parsed);
-          alert('Data imported successfully!');
+        // If small, handle synchronously
+        if (Array.isArray(parsed) && parsed.length > 100) {
+          // Chunked async parsing for large files
+          let chunkSize = 100;
+          let total = parsed.length;
+          let processed = 0;
+          let rows = [];
+          function processChunk(start) {
+            const end = Math.min(start + chunkSize, total);
+            rows = rows.concat(parsed.slice(start, end));
+            setImportProgress(Math.round((end / total) * 100));
+            if (end < total) {
+              setTimeout(() => processChunk(end), 0);
+            } else {
+              setImportLoading(false);
+              setImportPreview(rows);
+              setImportedRows(rows);
+              setPage(1);
+              // Show preview and confirm
+              const previewStr = rows.slice(0, 3).map((row, i) => JSON.stringify(row)).join('\n');
+              const confirmImport = window.confirm(
+                `Preview (first 3 rows):\n${previewStr}\n\nImport ${rows.length} entries from ${file.name}?`
+              );
+              if (confirmImport) {
+                mergeImportedData(rows);
+                setImportPreview(null);
+                alert('Data imported successfully!');
+                window.location.reload();
+              } else {
+                setImportPreview(null);
+              }
+            }
+          }
+          processChunk(0);
+        } else {
+          // Small file, handle synchronously
+          setImportLoading(false);
+          setImportPreview(parsed);
+          setImportedRows(Array.isArray(parsed) ? parsed : []);
+          setPage(1);
+          const previewStr = Array.isArray(parsed)
+            ? parsed.slice(0, 3).map((row, i) => JSON.stringify(row)).join('\n')
+            : JSON.stringify(parsed, null, 2).slice(0, 200);
+          const confirmImport = window.confirm(
+            `Preview (first 3 rows):\n${previewStr}\n\nImport ${Array.isArray(parsed) ? parsed.length : Object.keys(parsed).length} entries from ${file.name}?`
+          );
+          if (confirmImport) {
+            mergeImportedData(parsed);
+            setImportPreview(null);
+            alert('Data imported successfully!');
+            window.location.reload();
+          } else {
+            setImportPreview(null);
+          }
         }
       } catch (err) {
+        setImportLoading(false);
         console.error(err);
         alert('Failed to parse file. Please check the format.');
       }
@@ -71,7 +128,12 @@ export default function Settings() {
       if ('weight' in first || 'bodyFat' in first) {
         // Treat as body stat logs
         const stats = JSON.parse(localStorage.getItem('bodyStats') || '[]');
-        parsed.forEach((entry) => stats.push(entry));
+        parsed.forEach((entry) => {
+          // Deduplicate by date/weight/bodyFat
+          if (!stats.some((s) => s.date === entry.date && s.weight === entry.weight && s.bodyFat === entry.bodyFat)) {
+            stats.push(entry);
+          }
+        });
         localStorage.setItem('bodyStats', JSON.stringify(stats));
         return;
       }
@@ -125,12 +187,12 @@ export default function Settings() {
         if (!routine.exercises.find((ex) => ex.id === id)) {
           routine.exercises.push({ id, name, sets: [{ reps: reps || '', weight: weight || '' }] });
         }
-        // Add to exercise logs
+        // Add to exercise logs, deduplicate by date/reps/weight
         logs[id] = logs[id] || [];
-        logs[id].push({
-          date: date,
-          sets: [ { reps: reps || '', weight: weight || '' } ],
-        });
+        const newLog = { date: date, sets: [ { reps: reps || '', weight: weight || '' } ] };
+        if (!logs[id].some((l) => l.date === newLog.date && l.sets[0].reps === newLog.sets[0].reps && l.sets[0].weight === newLog.sets[0].weight)) {
+          logs[id].push(newLog);
+        }
       });
       localStorage.setItem('exerciseLogs', JSON.stringify(logs));
       localStorage.setItem('importedExercises', JSON.stringify(importedExercises));
@@ -140,7 +202,11 @@ export default function Settings() {
       const logs = JSON.parse(localStorage.getItem('exerciseLogs') || '{}');
       Object.keys(parsed).forEach((id) => {
         logs[id] = logs[id] || [];
-        logs[id] = logs[id].concat(parsed[id]);
+        parsed[id].forEach((entry) => {
+          if (!logs[id].some((l) => l.date === entry.date && JSON.stringify(l.sets) === JSON.stringify(entry.sets))) {
+            logs[id].push(entry);
+          }
+        });
       });
       localStorage.setItem('exerciseLogs', JSON.stringify(logs));
     }
@@ -262,6 +328,42 @@ export default function Settings() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
           <span>Import Data (CSV or JSON)</span>
           <input type="file" accept=".csv,.json" onChange={handleImport} />
+          {importLoading && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <span>Importing workout data... please wait.</span>
+              <div style={{ width: '100%', background: '#eee', borderRadius: 4, marginTop: 4 }}>
+                <div style={{ width: `${importProgress}%`, height: 8, background: 'linear-gradient(90deg, #8b5cf6, #6366f1)', borderRadius: 4 }}></div>
+              </div>
+            </div>
+          )}
+          {/* Paginated preview after import */}
+          {importPreview && Array.isArray(importedRows) && importedRows.length > 0 && !importLoading && (
+            <div style={{ marginTop: '1rem' }}>
+              <span>Imported Rows (Page {page} of {Math.ceil(importedRows.length / PAGE_SIZE)})</span>
+              <table style={{ width: '100%', fontSize: 12, marginTop: 4 }}>
+                <thead>
+                  <tr>
+                    {Object.keys(importedRows[0] || {}).map((h) => (
+                      <th key={h} style={{ textAlign: 'left', padding: 2 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {importedRows.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE).map((row, idx) => (
+                    <tr key={idx}>
+                      {Object.values(row).map((v, i) => (
+                        <td key={i} style={{ padding: 2 }}>{String(v)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button disabled={page === 1} onClick={() => setPage(page-1)}>Prev</button>
+                <button disabled={page === Math.ceil(importedRows.length / PAGE_SIZE)} onClick={() => setPage(page+1)}>Next</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Export data options */}

@@ -23,7 +23,14 @@ export default function UserProvider({ children }) {
   const [users, setUsers] = useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('users');
-      return stored ? JSON.parse(stored) : [];
+      let arr = stored ? JSON.parse(stored) : [];
+      // Migrate: ensure all users have weeklyGoal and currentSetsDone
+      arr = arr.map(u => ({
+        ...u,
+        weeklyGoal: u.weeklyGoal ?? 400,
+        currentSetsDone: u.currentSetsDone ?? 0,
+      }));
+      return arr;
     }
     return [];
   });
@@ -63,7 +70,12 @@ export default function UserProvider({ children }) {
 
   function createUser(userData) {
     const id = Date.now().toString();
-    const newUser = { id, ...userData };
+    const newUser = {
+      id,
+      ...userData,
+      weeklyGoal: 400,
+      currentSetsDone: 0,
+    };
     setUsers((prev) => [...prev, newUser]);
     setCurrentUserId(id);
   }
@@ -78,7 +90,22 @@ export default function UserProvider({ children }) {
   }
 
   function updateUser(id, updates) {
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...updates } : u)));
+    setUsers((prev) => prev.map((u) => {
+      if (u.id === id) {
+        // Only allow positive integer for weeklyGoal if present
+        let next = { ...u, ...updates };
+        if ('weeklyGoal' in updates) {
+          const val = Number(updates.weeklyGoal);
+          next.weeklyGoal = Number.isInteger(val) && val > 0 ? val : u.weeklyGoal ?? 400;
+        }
+        if ('currentSetsDone' in updates) {
+          const val = Number(updates.currentSetsDone);
+          next.currentSetsDone = Number.isInteger(val) && val >= 0 ? val : u.currentSetsDone ?? 0;
+        }
+        return next;
+      }
+      return u;
+    }));
   }
 
   // Register a new user with email and password
@@ -103,6 +130,8 @@ export default function UserProvider({ children }) {
       units: 'kg',
       theme: 'dark',
       photo: '',
+      weeklyGoal: 400,
+      currentSetsDone: 0,
     };
     setUsers((prev) => [...prev, newUser]);
     setCurrentUserId(id);
@@ -123,6 +152,14 @@ export default function UserProvider({ children }) {
   }
 
   function logoutUser() {
+    // Remove all user/session-specific data from localStorage
+    //localStorage.removeItem('currentUserId');
+    localStorage.removeItem('loggedIn');
+    // Optionally clear logs, stats, etc. for privacy (comment out if you want to keep logs for next login)
+    // localStorage.removeItem('weightLogs_' + currentUserId);
+    // localStorage.removeItem('bodyStats');
+    // localStorage.removeItem('exerciseLogs');
+    // localStorage.removeItem('bodyPhotos_' + currentUserId);
     setLoggedIn(false);
     setCurrentUserId(null);
   }

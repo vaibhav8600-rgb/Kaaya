@@ -148,13 +148,13 @@ export default function WeightTracker() {
       {/* Entry form */}
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <label>Weight ({currentUser?.units || 'kg'})</label>
-        <input type="number" value={weight} onChange={(e) => setWeight(e.target.value)} />
+        <input type="number" value={weight !== undefined && weight !== null ? weight : ''} onChange={(e) => setWeight(e.target.value)} />
         <label>Body Fat % (optional)</label>
-        <input type="number" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} />
+        <input type="number" value={bodyFat !== undefined && bodyFat !== null ? bodyFat : ''} onChange={(e) => setBodyFat(e.target.value)} />
         <label>Water % (optional)</label>
-        <input type="number" value={water} onChange={(e) => setWater(e.target.value)} />
+        <input type="number" value={water !== undefined && water !== null ? water : ''} onChange={(e) => setWater(e.target.value)} />
         <label>Lean Mass (optional)</label>
-        <input type="number" value={lean} onChange={(e) => setLean(e.target.value)} />
+        <input type="number" value={lean !== undefined && lean !== null ? lean : ''} onChange={(e) => setLean(e.target.value)} />
         <button onClick={addEntry} className="btn-glow" style={{ marginTop: '0.5rem' }}>
           Add Entry
         </button>
@@ -165,13 +165,13 @@ export default function WeightTracker() {
         <label>Target Weight ({currentUser?.units || 'kg'})</label>
         <input
           type="number"
-          value={currentUser?.goalWeight || ''}
+          value={currentUser?.goalWeight !== undefined && currentUser?.goalWeight !== null ? currentUser.goalWeight : ''}
           onChange={(e) => updateUser(currentUser.id, { goalWeight: e.target.value })}
         />
         <label>Goal Date</label>
         <input
           type="date"
-          value={currentUser?.goalDate || ''}
+          value={currentUser?.goalDate !== undefined && currentUser?.goalDate !== null ? currentUser.goalDate : ''}
           onChange={(e) => updateUser(currentUser.id, { goalDate: e.target.value })}
         />
         {goalWeight && currentWeight != null && (
@@ -227,11 +227,21 @@ export default function WeightTracker() {
         {sortedLogs.map((entry, idx) => (
           <div
             key={idx}
-            style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0' }}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.25rem 0' }}
           >
             <span>{new Date(entry.date).toLocaleDateString()}</span>
             <span>{entry.weight} {currentUser?.units || 'kg'}</span>
             {entry.bodyFat != null && <span>{entry.bodyFat}%</span>}
+            <button
+              aria-label="Delete log"
+              style={{ background: 'none', border: 'none', color: '#ec4899', cursor: 'pointer', fontSize: '1.1rem', marginLeft: 8 }}
+              onClick={() => {
+                setLogs((prev) => prev.filter((l, i) => i !== idx));
+              }}
+              title="Delete entry"
+            >
+              🗑️
+            </button>
           </div>
         ))}
       </div>

@@ -9,8 +9,8 @@ import { UserContext } from '../context/UserContext';
 export default function BodyStats() {
   const { currentUser, updateUser } = useContext(UserContext);
   const userId = currentUser ? currentUser.id : null;
-  const [weight, setWeight] = useState(currentUser?.bodyWeight || '');
-  const [bodyFat, setBodyFat] = useState(currentUser?.bodyFat || '');
+  const [weight, setWeight] = useState(currentUser?.bodyWeight !== undefined && currentUser?.bodyWeight !== null ? currentUser.bodyWeight : '');
+  const [bodyFat, setBodyFat] = useState(currentUser?.bodyFat !== undefined && currentUser?.bodyFat !== null ? currentUser.bodyFat : '');
   const [photos, setPhotos] = useState([]);
 
   // Load saved photos from localStorage on mount or when user changes
@@ -69,14 +69,14 @@ export default function BodyStats() {
           <label style={{ fontSize: '0.875rem', color: 'var(--muted-color)' }}>Current Weight ({currentUser.units || 'kg'})</label>
           <input
             type="number"
-            value={weight}
+            value={weight !== undefined && weight !== null ? weight : ''}
             onChange={(e) => setWeight(e.target.value)}
             placeholder="Enter weight"
           />
           <label style={{ fontSize: '0.875rem', color: 'var(--muted-color)' }}>Body Fat %</label>
           <input
             type="number"
-            value={bodyFat}
+            value={bodyFat !== undefined && bodyFat !== null ? bodyFat : ''}
             onChange={(e) => setBodyFat(e.target.value)}
             placeholder="Enter body fat %"
           />
@@ -88,15 +88,41 @@ export default function BodyStats() {
           </label>
           <input type="file" accept="image/*" multiple onChange={handleFileChange} />
         </div>
-        {/* Photo thumbnails */}
+        {/* Photo thumbnails with delete */}
         <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto' }}>
           {photos.map((src, idx) => (
-            <img
-              key={idx}
-              src={src}
-              alt={`progress-${idx}`}
-              className="photo-thumb"
-            />
+            <div key={idx} style={{ position: 'relative', display: 'inline-block' }}>
+              <img
+                src={src}
+                alt={`progress-${idx}`}
+                className="photo-thumb"
+                style={{ display: 'block' }}
+              />
+              <button
+                aria-label="Delete photo"
+                style={{
+                  position: 'absolute',
+                  top: 2,
+                  right: 2,
+                  background: 'rgba(0,0,0,0.5)',
+                  border: 'none',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  width: 22,
+                  height: 22,
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                }}
+                onClick={() => setPhotos((prev) => prev.filter((_, i) => i !== idx))}
+                title="Delete photo"
+              >
+                🗑️
+              </button>
+            </div>
           ))}
         </div>
         {/* Save stats button */}

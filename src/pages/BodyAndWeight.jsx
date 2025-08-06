@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { UserContext } from '../context/UserContext';
 import { Line } from 'react-chartjs-2';
+import { UserContext } from '../context/UserContext';
+import { validateAndCompressImage, MAX_IMAGE_SIZE_MB } from '../utils/imageUtils';
 import {
   Chart,
   LineElement,
@@ -12,36 +13,27 @@ import {
   Filler,
 } from 'chart.js';
 
-// Register necessary Chart.js components once
 Chart.register(LineElement, CategoryScale, LinearScale, PointElement, Legend, Tooltip, Filler);
 
-/**
- * Stats page combines weight tracking and body measurements/photo logging into a
- * single unified interface.  Users can add weight entries, view trends and
- * consistency heatmaps, edit measurements like body fat and custom fields,
- * and upload progress photos.  All data is persisted per user in localStorage
- * via context or explicit storage keys.
- */
-export default function Stats() {
+export default function BodyAndWeight() {
   const { currentUser, updateUser } = useContext(UserContext);
   const userId = currentUser ? currentUser.id : null;
-  // Weight entry fields
-  const [weightInput, setWeightInput] = useState('');
-  const [bodyFatInput, setBodyFatInput] = useState('');
-  const [waterInput, setWaterInput] = useState('');
-  const [leanInput, setLeanInput] = useState('');
-  // Weight logs
+  // Weight log state
+  const [weight, setWeight] = useState('');
+  const [bodyFat, setBodyFat] = useState('');
+  const [water, setWater] = useState('');
+  const [lean, setLean] = useState('');
   const [logs, setLogs] = useState([]);
-  // Measurement fields (persisted in user object)
-  const [bodyWeight, setBodyWeight] = useState(currentUser?.bodyWeight !== undefined && currentUser?.bodyWeight !== null ? currentUser.bodyWeight : '');
-  const [bodyFat, setBodyFat] = useState(currentUser?.bodyFat !== undefined && currentUser?.bodyFat !== null ? currentUser.bodyFat : '');
-  const [arms, setArms] = useState(currentUser?.arms !== undefined && currentUser?.arms !== null ? currentUser.arms : '');
-  const [chest, setChest] = useState(currentUser?.chest !== undefined && currentUser?.chest !== null ? currentUser.chest : '');
-  const [waist, setWaist] = useState(currentUser?.waist !== undefined && currentUser?.waist !== null ? currentUser.waist : '');
+  // Measurements state
+  const [bodyWeight, setBodyWeight] = useState(currentUser?.bodyWeight || '');
+  const [bodyFatM, setBodyFatM] = useState(currentUser?.bodyFat || '');
+  const [arms, setArms] = useState(currentUser?.arms || '');
+  const [chest, setChest] = useState(currentUser?.chest || '');
+  const [waist, setWaist] = useState(currentUser?.waist || '');
   // Photos
   const [photos, setPhotos] = useState([]);
 
-  // Load weight logs and photos from localStorage on mount or when user changes
+  // Load logs and photos from localStorage on mount or user change
   useEffect(() => {
     if (userId) {
       const storedLogs = localStorage.getItem(`weightLogs_${userId}`);
@@ -51,54 +43,44 @@ export default function Stats() {
     }
   }, [userId]);
 
-  // Persist weight logs when they change
+  // Persist logs/photos when they change
   useEffect(() => {
     if (userId) {
-      try {
-        localStorage.setItem(`weightLogs_${userId}`, JSON.stringify(logs));
-      } catch (e) {
-        console.error('Failed to persist weight logs', e);
-      }
+      localStorage.setItem(`weightLogs_${userId}`, JSON.stringify(logs));
     }
   }, [logs, userId]);
-
-  // Persist photos when they change
   useEffect(() => {
     if (userId) {
       localStorage.setItem(`bodyPhotos_${userId}`, JSON.stringify(photos));
     }
   }, [photos, userId]);
 
-  // Handler to add weight entry
+  // Add weight entry
   function addWeightEntry() {
-    if (!weightInput) return;
+    if (!weight) return;
     const entry = {
       date: new Date().toISOString(),
-      weight: parseFloat(weightInput),
-      bodyFat: bodyFatInput ? parseFloat(bodyFatInput) : null,
-      water: waterInput ? parseFloat(waterInput) : null,
-      lean: leanInput ? parseFloat(leanInput) : null,
+      weight: parseFloat(weight),
+      bodyFat: bodyFat ? parseFloat(bodyFat) : null,
+      water: water ? parseFloat(water) : null,
+      lean: lean ? parseFloat(lean) : null,
     };
     setLogs((prev) => {
       const updated = [...prev, entry];
-      // Immediately persist to avoid data loss
       if (userId) {
         localStorage.setItem(`weightLogs_${userId}`, JSON.stringify(updated));
       }
       return updated;
     });
-    setWeightInput('');
-    setBodyFatInput('');
-    setWaterInput('');
-    setLeanInput('');
+    setWeight(''); setBodyFat(''); setWater(''); setLean('');
   }
 
-  // Save measurement fields to user profile
+  // Save measurements
   function saveMeasurements() {
     if (currentUser) {
       updateUser(currentUser.id, {
         bodyWeight: bodyWeight,
-        bodyFat: bodyFat,
+        bodyFat: bodyFatM,
         arms: arms,
         chest: chest,
         waist: waist,
@@ -106,30 +88,27 @@ export default function Stats() {
     }
   }
 
-  // Handle photo uploads (convert to base64 and persist)
-  function handlePhotoChange(event) {
+  // Handle photo uploads
+  async function handlePhotoChange(event) {
     const files = event.target.files;
     if (!files) return;
     const promises = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const reader = new FileReader();
-      const promise = new Promise((resolve) => {
-        reader.onload = () => resolve(reader.result);
-      });
-      reader.readAsDataURL(file);
-      promises.push(promise);
+      promises.push(
+        validateAndCompressImage(file)
+          .then(({ thumbnail }) => thumbnail)
+          .catch((err) => {
+            alert(err.message || `Image too large. Please upload an image under ${MAX_IMAGE_SIZE_MB}MB.`);
+            return null;
+          })
+      );
     }
-    Promise.all(promises).then((dataUrls) => {
-      setPhotos((prev) => [...prev, ...dataUrls]);
-    });
+    const dataUrls = await Promise.all(promises);
+    setPhotos((prev) => [...prev, ...dataUrls.filter(Boolean)]);
   }
 
-  if (!currentUser) {
-    return <p style={{ color: 'var(--muted-color)' }}>No user selected.</p>;
-  }
-
-  // Prepare data for chart
+  // Chart data
   const sortedLogs = [...logs].sort((a, b) => new Date(a.date) - new Date(b.date));
   const labels = sortedLogs.map((l) => new Date(l.date).toLocaleDateString());
   const weights = sortedLogs.map((l) => l.weight);
@@ -166,6 +145,10 @@ export default function Stats() {
     heatmap.push({ date: dateStr, logged: hasEntry });
   }
 
+  if (!currentUser) {
+    return <p style={{ color: 'var(--muted-color)' }}>No user selected.</p>;
+  }
+
   return (
     <div>
       <h1>Body & Weight</h1>
@@ -173,13 +156,13 @@ export default function Stats() {
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <h2>Weight Log</h2>
         <label>Weight ({currentUser.units || 'kg'})</label>
-        <input type="number" value={weightInput !== undefined && weightInput !== null ? weightInput : ''} onChange={(e) => setWeightInput(e.target.value)} />
+        <input type="number" value={weight} onChange={(e) => setWeight(e.target.value)} />
         <label>Body Fat % (optional)</label>
-        <input type="number" value={bodyFatInput !== undefined && bodyFatInput !== null ? bodyFatInput : ''} onChange={(e) => setBodyFatInput(e.target.value)} />
+        <input type="number" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} />
         <label>Water % (optional)</label>
-        <input type="number" value={waterInput !== undefined && waterInput !== null ? waterInput : ''} onChange={(e) => setWaterInput(e.target.value)} />
+        <input type="number" value={water} onChange={(e) => setWater(e.target.value)} />
         <label>Lean Mass (optional)</label>
-        <input type="number" value={leanInput !== undefined && leanInput !== null ? leanInput : ''} onChange={(e) => setLeanInput(e.target.value)} />
+        <input type="number" value={lean} onChange={(e) => setLean(e.target.value)} />
         <button onClick={addWeightEntry} className="btn-glow" style={{ marginTop: '0.5rem' }}>
           Add Entry
         </button>
@@ -211,15 +194,15 @@ export default function Stats() {
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <h2>Body Measurements</h2>
         <label>Body Weight ({currentUser.units || 'kg'})</label>
-        <input type="number" value={bodyWeight !== undefined && bodyWeight !== null ? bodyWeight : ''} onChange={(e) => setBodyWeight(e.target.value)} />
+        <input type="number" value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)} />
         <label>Body Fat %</label>
-        <input type="number" value={bodyFat !== undefined && bodyFat !== null ? bodyFat : ''} onChange={(e) => setBodyFat(e.target.value)} />
+        <input type="number" value={bodyFatM} onChange={(e) => setBodyFatM(e.target.value)} />
         <label>Arms (cm/in)</label>
-        <input type="number" value={arms !== undefined && arms !== null ? arms : ''} onChange={(e) => setArms(e.target.value)} />
+        <input type="number" value={arms} onChange={(e) => setArms(e.target.value)} />
         <label>Chest (cm/in)</label>
-        <input type="number" value={chest !== undefined && chest !== null ? chest : ''} onChange={(e) => setChest(e.target.value)} />
+        <input type="number" value={chest} onChange={(e) => setChest(e.target.value)} />
         <label>Waist (cm/in)</label>
-        <input type="number" value={waist !== undefined && waist !== null ? waist : ''} onChange={(e) => setWaist(e.target.value)} />
+        <input type="number" value={waist} onChange={(e) => setWaist(e.target.value)} />
         <button onClick={saveMeasurements} className="btn-glow" style={{ marginTop: '0.5rem' }}>
           Save Measurements
         </button>
@@ -230,7 +213,38 @@ export default function Stats() {
         <input type="file" accept="image/*" multiple onChange={handlePhotoChange} />
         <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto' }}>
           {photos.map((src, idx) => (
-            <img key={idx} src={src} alt={`progress-${idx}`} className="photo-thumb" />
+            <div key={idx} style={{ position: 'relative', display: 'inline-block' }}>
+              <img
+                src={src}
+                alt={`progress-${idx}`}
+                className="photo-thumb"
+                style={{ display: 'block' }}
+              />
+              <button
+                aria-label="Delete photo"
+                style={{
+                  position: 'absolute',
+                  top: 2,
+                  right: 2,
+                  background: 'rgba(0,0,0,0.5)',
+                  border: 'none',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  width: 22,
+                  height: 22,
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                }}
+                onClick={() => setPhotos((prev) => prev.filter((_, i) => i !== idx))}
+                title="Delete photo"
+              >
+                🗑️
+              </button>
+            </div>
           ))}
         </div>
       </div>
