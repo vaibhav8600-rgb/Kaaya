@@ -1,13 +1,36 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useContext } from 'react';
 import { motion } from 'framer-motion';
 import data, { getRoutines } from '../data/workouts';
-import { useContext } from 'react';
 import { UserContext } from '../context/UserContext';
 
 export default function Home() {
   const routines = getRoutines();
-  const { currentUser, updateUser } = useContext(UserContext);
+  // Only show routines with visibleOnHome !== false (default true)
+  const [routineList, setRoutineList] = useState(routines);
+  const [showManage, setShowManage] = useState(false);
+  const visibleRoutines = routineList.filter(r => r.visibleOnHome !== false);
+  const hiddenRoutines = routineList.filter(r => r.visibleOnHome === false);
+
+  // Hide routine handler
+  function toggleVisibility(routineId) {
+    setRoutineList(prev => prev.map(r =>
+      r.id === routineId ? { ...r, visibleOnHome: r.visibleOnHome === false ? true : false } : r
+    ));
+    // Update in localStorage for imported routines
+    let imported = [];
+    try {
+      imported = JSON.parse(localStorage.getItem('importedRoutines')) || [];
+    } catch { imported = []; }
+    let updated = false;
+    imported = imported.map(r => {
+      if (r.id === routineId) { updated = true; return { ...r, visibleOnHome: r.visibleOnHome === false ? true : false }; }
+      return r;
+    });
+    if (updated) {
+      localStorage.setItem('importedRoutines', JSON.stringify(imported));
+    }
+  }
+  const { currentUser, updateUser } = useContext(UserContext) || {};
   // Weekly goal state logic
   const [goalInput, setGoalInput] = useState(() => {
     if (currentUser?.weeklyGoal !== undefined && currentUser?.weeklyGoal !== null) return currentUser.weeklyGoal;
@@ -93,20 +116,92 @@ export default function Home() {
           </div>
         </div>
       </div>
-      {/* Routines */}
-      {routines.map((routine) => (
-        <div key={routine.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <p style={{ fontSize: '1.125rem', fontWeight: '600' }}>{routine.name}</p>
-            <p style={{ fontSize: '0.875rem', color: '#9ca3af' }}>{routine.description}</p>
-          </div>
-          <Link to={`/workout?routine=${routine.id}`}>
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn-glow">
-              Start
-            </motion.button>
-          </Link>
+      {/* Floating Manage Routines Icon Button */}
+      <div
+        className="fixed bottom-6 right-6 bg-black/30 p-3 rounded-full border border-cyan-500 shadow-[0_0_12px_#00eaff] hover:bg-cyan-500 hover:text-black drop-shadow-[0_0_8px_#8b5cf6] cursor-pointer transition duration-200 z-50"
+        onClick={() => setShowManage(true)}
+        title="Manage Routines"
+        aria-label="Manage Routines"
+        style={{ lineHeight: 1, fontSize: '1.7rem', display: 'flex', alignItems: 'center', justifyContent: 'right' }}
+      >
+        ⚙️ 
+      </div>
+      {visibleRoutines.length === 0 ? (
+        <div className="card" style={{ margin: '1rem 0', color: '#f87171', textAlign: 'center' }}>
+          No active routines. Add from builder.
         </div>
-      ))}
+      ) : (
+        visibleRoutines.map((routine) => (
+          <motion.div
+            key={routine.id}
+            whileHover={{ scale: 1.02, boxShadow: '0 0 18px #00eaff' }}
+            whileTap={{ scale: 0.98 }}
+            className="relative card p-4 rounded-xl bg-black/20 border border-cyan-700 backdrop-blur shadow-[0_0_15px_#00eaff] min-h-[110px] cursor-pointer transition"
+            tabIndex={0}
+            onClick={() => window.location.href = `/workout?routine=${routine.id}`}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                window.location.href = `/workout?routine=${routine.id}`;
+              }
+            }}
+            aria-label={`Start ${routine.name} routine`}
+            role="button"
+          >
+            {/* Hide icon top-right */}
+            <div
+              onClick={e => { e.stopPropagation(); toggleVisibility(routine.id); }}
+              title="Hide Routine"
+              aria-label="Hide Routine"
+              className="absolute top-2 right-2 p-1 rounded-full bg-black/30 hover:bg-black/50 cursor-pointer text-pink-300 z-10"
+              style={{ lineHeight: 1, fontSize: '1.1rem', display: 'flex', alignItems: 'center', justifyContent: 'right'}}
+            >
+              👁️
+            </div>
+            <h3 className="text-white font-semibold text-lg" style={{ margin: 0 }}>{routine.name}</h3>
+            <p className="text-gray-400 text-sm mt-3">{routine.description || (routine.muscleGroups ? routine.muscleGroups.join(', ') : '')}</p>
+          </motion.div>
+        ))
+      )}
+
+      {/* Manage Hidden Routines Modal */}
+      {showManage && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)',
+          zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div className="bg-black/90 p-6 rounded-xl border border-violet-500 shadow-lg" style={{ minWidth: 320, maxWidth: 400 }}>
+            <h2 className="text-xl font-bold text-white mb-4">Hidden Routines</h2>
+            {hiddenRoutines.length === 0 ? (
+              <div className="text-slate-400 italic mb-4">No hidden routines.</div>
+            ) : (
+              hiddenRoutines.map(routine => (
+                <div key={routine.id} className="bg-black/40 p-3 rounded-lg mb-3 border border-violet-500 flex items-center justify-between">
+                  <h4 className="text-white" style={{ margin: 0 }}>{routine.name}</h4>
+                  <div
+                    onClick={() => toggleVisibility(routine.id)}
+                    title="Unhide Routine"
+                    aria-label="Unhide Routine"
+                    className="cursor-pointer text-cyan-400 hover:text-green-400 text-[1.15rem] drop-shadow-[0_0_5px_#00eaff] transition duration-200"
+                    style={{ marginLeft: 12 }}
+                  >
+                    👁️
+                  </div>
+                </div>
+              ))
+            )}
+            <button
+              className="mt-2 px-4 py-1 rounded bg-cyan-500 text-black hover:bg-cyan-400 transition-all duration-200"
+              onClick={() => setShowManage(false)}
+              style={{ width: '100%' }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
